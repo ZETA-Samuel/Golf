@@ -22,4 +22,11 @@ Pygame
 
 Pygbag
 
+-----------------------------------------------------------
+There is no end screen (not yet) so to play again simply reload the game.
+Since this is a browser based game you shouldn't face any issues and the bugs (most common ones) have been resolved.
+I hope you enjoy this game alot. 
+If you find any bugs, you can contact me at:
+Gmail: sargamsubedi7@gmail.com
+
 Have fun playing! 
