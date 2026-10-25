@@ -5,7 +5,7 @@ pygame.init()
 clock = pygame.time.Clock()
 
 # full screen
-full_width,full_height = 1120,960
+full_width,full_height = 1325,960
 
 width = 960
 height = 540
@@ -18,11 +18,15 @@ play_y = (full_height - height) // 2
 
 # Settings
 radius = 13
-power = 7.0
+power = 8.0
 max_drag = 150
 friction = 0.98
 bounce = 0.8
-stop_speed = 0.1
+stop_speed = 5.0
+hole_capture_speed = 350
+overshoot_slowdown_radius = 60
+overshoot_slowdown_duration = 0.35
+overshoot_friction = 0.94
 
 
 # screen
@@ -55,9 +59,9 @@ par = pygame.transform.scale(par,(250,100))
 birdie = pygame.transform.scale(birdie,(250,100))
 eagle = pygame.transform.scale(eagle,(250,100))
 bogey = pygame.transform.scale(bogey,(250,100))
-double_bogey = pygame.transform.scale(double_bogey,(250,100))
-triple_bogey = pygame.transform.scale(triple_bogey,(250,100))
-quadruple_bogey = pygame.transform.scale(quadruple_bogey,(250,100))
+double_bogey = pygame.transform.scale(double_bogey,(320,100))
+triple_bogey = pygame.transform.scale(triple_bogey,(320,100))
+quadruple_bogey = pygame.transform.scale(quadruple_bogey,(350,100))
 
 # Text Font
 text_font = pygame.font.SysFont("Arial",30)
@@ -127,6 +131,17 @@ levels = [
     },
     {
         "start": (80, height/2),
+        "hole": (width-80, height/2),
+        "walls": [],
+        "moving_walls": [
+            pygame.Rect(width/3,0,12,height*0.9),
+            pygame.Rect(2*width/3,0,12,height*0.9),
+        ],
+        "wall_speed": 1,
+        "wall_direction": 1,
+    },
+    {
+        "start": (80, height/2),
         "hole": (width-80,height/2),
         "walls":[
             pygame.Rect(width/2,0,12,height*0.4),
@@ -135,7 +150,7 @@ levels = [
         "moving_walls": [
             pygame.Rect(width/2,height*0.4,12,height*0.1),
         ],
-        "wall_speed": 1,
+        "wall_speed": 2,
         "wall_direction": 1,
     },
 ]
@@ -155,16 +170,15 @@ def load_level(level_number):
 
     return pos,vel,hole_x,hole_y,walls,moving_walls,wall_speed,wall_direction,attempt
 
-
-
-
 async def main():
+    game_state = "home"
 
     hole_x,hole_y = 700, height /2  
     dragging = False
     running = True
     show_result = False
     result_image = None
+    overshoot_slowdown_timer = 0.0
 
     
     current_level = 0
@@ -173,17 +187,37 @@ async def main():
     screen.fill((35,35,45))
 
     while running:
+        print("GAME LOOP RUNNING")
         dt = clock.tick(60) / 1000
         mouse = pygame.Vector2(pygame.mouse.get_pos()) - pygame.Vector2(play_x, play_y)
 
         for event in pygame.event.get():
+            print("Event:",event)
+
             if event.type == pygame.QUIT:
                 running = False
 
-            elif event.type == pygame.KEYDOWN and show_result:
-                if event.key == pygame.K_RETURN:
-                
-                        
+            elif event.type == pygame.KEYDOWN :
+                print("Key pressed:", event.key)
+                # home screen
+                if game_state == "home":
+                    if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                        game_state = "playing"
+
+                # End screen
+                elif game_state == "end":
+                    if event.key == pygame.K_RETURN:
+                        current_level = 0
+
+                        pos, vel, hole_x, hole_y,walls,moving_walls, wall_speed, wall_direction, attempt = load_level(current_level)
+
+                        show_result = False
+                        result_image = None
+                        dragging = False
+                        game_state = "playing"
+
+                # after completing a level
+                elif game_state == "playing" and show_result and event.key == pygame.K_RETURN:
                     current_level += 1
 
                     if current_level < len(levels):
@@ -193,18 +227,17 @@ async def main():
                         result_image = None
                         dragging = False
 
-
-                        print(f"Level {current_level + 1}")
                     else:
-                        print("Congratulations! You completed all levels!")
-                        running = False
+                        game_state = "end"
+                        show_result = False
 
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not show_result:
-                if mouse.distance_to(pos) <= radius:
+            elif event.type == pygame.MOUSEBUTTONDOWN and game_state == "playing"  and event.button == 1 and not show_result:
+                if vel.length_squared() == 0 and mouse.distance_to(pos) <= radius:
                     dragging = True
-                    vel.update(0,0)
+                    overshoot_slowdown_timer = 0.0
 
-            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1 and not show_result:
+
+            elif event.type == pygame.MOUSEBUTTONUP and game_state == "playing" and event.button == 1 and not show_result:
 
                 if mouse.distance_to(pos) >= radius:
                     if dragging:
@@ -219,13 +252,46 @@ async def main():
                         pull.scale_to_length(max_drag)
                     vel = pull * power
 
+        if game_state == "home":
+            screen.fill((35,35,45))
+
+            draw_text(screen,"GOLF",text_font,(255,255,255), full_width // 2, full_height // 2 -60)
+            draw_text(screen,"Press ENTER to start",text_font,(255,220,100),full_width // 2,full_height // 2 + 20)
+
+            pygame.display.flip()
+            await asyncio.sleep(0)
+            continue
+
+        if game_state == "end":
+            screen.fill((35,35,45))
+            draw_text(screen,"YOU COMPLETED ALL LEVELS!", text_font,(255,255,255), full_width // 2, full_height // 2 -60)
+            draw_text(screen,"Press ENTER to Play Again",text_font,(255,220,100),full_width // 2, full_height // 2 + 20)
+
+            pygame.display.flip()
+            await asyncio.sleep(0)
+            continue
+
         previous_pos = pos.copy()
         previous_rect = ball_img.get_rect(center=(round(previous_pos.x), round(previous_pos.y)))
-            
+        
 
         if not dragging and not show_result:
             pos += vel * dt
-            vel *= friction ** (dt *60)
+
+            movement = pos - previous_pos
+            if overshoot_slowdown_timer <= 0 and vel.length() >= hole_capture_speed and movement.length_squared() > 0:
+                hole_position = pygame.Vector2(hole_x, hole_y)
+                to_hole = hole_position - previous_pos
+                closest_t = max(0, min(1, to_hole.dot(movement) / movement.length_squared()))
+                closest_position = previous_pos + movement * closest_t
+                if closest_position.distance_to(hole_position) <= overshoot_slowdown_radius:
+                    overshoot_slowdown_timer = overshoot_slowdown_duration
+
+            active_friction = friction
+            if overshoot_slowdown_timer > 0:
+                active_friction = overshoot_friction
+                overshoot_slowdown_timer = max(0, overshoot_slowdown_timer - dt)
+            vel *= active_friction ** (dt * 60)
 
         if pos.x < radius:
             pos.x = radius
@@ -305,7 +371,7 @@ async def main():
         offset_x,offset_y = (hole_x - pos.x),(hole_y - pos.y)
         offset = (offset_x**2 + offset_y**2)**(1/2)
 
-        if not show_result and offset <= 20 and vel.length() < 200:
+        if not show_result and offset <= 20 and vel.length() < hole_capture_speed:
             pos.x,pos.y = hole_x,hole_y
             vel.update(0,0)
             show_result = True    
@@ -327,10 +393,7 @@ async def main():
                 result_image = quadruple_bogey
             else:
                 result_image = game_over
-                current_level = 0
-            
-        #else:
-        #    vel*= 0.90
+                current_level = -1
 
         if show_result:
             game_surface.blit(result_image, result_image.get_rect(center=(width //2,height//2)))
