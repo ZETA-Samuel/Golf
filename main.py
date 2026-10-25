@@ -129,16 +129,22 @@ levels = [
         "wall_speed": 0,
         "wall_direction": 0,
     },
+
     {
         "start": (80, height/2),
-        "hole": (width-80, height/2),
-        "walls": [],
-        "moving_walls": [
-            pygame.Rect(width/3,0,12,height*0.9),
-            pygame.Rect(2*width/3,0,12,height*0.9),
+        "hole": (width-80,height/2),
+        "walls": [
+            pygame.Rect(width/4,0,12,height*0.2),
+            pygame.Rect(width/4,height*0.3,12,height*0.7),
+            pygame.Rect(width/2,0,12,height*0.6),
+            pygame.Rect(width/2,height*0.7,12,height*0.3),
+            pygame.Rect(3*width/4,0,12,height*0.45),
+            pygame.Rect(3*width/4,height*0.55,12,height*0.45),
+
         ],
-        "wall_speed": 1,
-        "wall_direction": 1,
+        "moving_walls": [],
+        "wall_speed": 0,
+        "wall_direction": 0,
     },
     {
         "start": (80, height/2),
